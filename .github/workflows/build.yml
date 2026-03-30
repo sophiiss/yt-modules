@@ -51,6 +51,37 @@ jobs:
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
 
+      # ── NEW STEP ──────────────────────────────────────────────────────────────
+      - name: Get YouTube patch version
+        id: yt_version
+        run: |
+          YT_VER=""
+
+          # 1. Try the patched YouTube APK filename (e.g. youtube-revanced-19.16.39.apk)
+          for f in build/youtube*.apk; do
+            [ -f "$f" ] || continue
+            VER=$(basename "$f" | grep -oP '\d+\.\d+\.\d+' | head -1)
+            if [ -n "$VER" ]; then YT_VER="$VER"; break; fi
+          done
+
+          # 2. Fall back to version= in the module zip's module.prop
+          if [ -z "$YT_VER" ]; then
+            for f in build/*module*.zip; do
+              [ -f "$f" ] || continue
+              VER=$(unzip -p "$f" module.prop 2>/dev/null | grep "^version=" | cut -d= -f2 | tr -d '[:space:]')
+              if [ -n "$VER" ]; then YT_VER="$VER"; break; fi
+            done
+          fi
+
+          # 3. Last resort: keep the incrementing integer so nothing breaks
+          if [ -z "$YT_VER" ]; then
+            YT_VER="${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
+          fi
+
+          echo "YT_VERSION=$YT_VER" >> $GITHUB_OUTPUT
+          echo "Resolved release version: $YT_VER"
+      # ─────────────────────────────────────────────────────────────────────────
+
       - name: Get output
         id: get_output
         run: |
@@ -66,8 +97,8 @@ jobs:
           body: ${{ steps.get_output.outputs.BUILD_LOG }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./build/*
-          release_name: ReVanced
-          tag: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          release_name: ReVanced ${{ steps.yt_version.outputs.YT_VERSION }}   # ← changed
+          tag: ${{ steps.yt_version.outputs.YT_VERSION }}                      # ← changed
           file_glob: true
           overwrite: true
 
@@ -93,7 +124,7 @@ jobs:
             UPDATE_JSON="${UPDATE_JSON##*/}"
             VER=$(echo "$ZIP_S" | grep version=)
             VER="${VER##*=}"
-            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
+            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.yt_version.outputs.YT_VERSION }}/${OUTPUT}"   # ← changed
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
@@ -105,7 +136,7 @@ jobs:
           branch: update
           skip_checkout: true
           file_pattern: build.md *-update.json
-          commit_message: Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          commit_message: Bump version ${{ steps.yt_version.outputs.YT_VERSION }}   # ← changed
 
       - name: Report to Telegram
         env:
@@ -119,7 +150,7 @@ jobs:
           APKS=""
           MODULES=""
           for OUTPUT in *; do
-            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
+            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.yt_version.outputs.YT_VERSION }}/${OUTPUT}"   # ← changed
             if [[ $OUTPUT = *.apk ]]; then
               APKS+="${NL}📦[${OUTPUT}](${DL_URL})"
             elif [[ $OUTPUT = *.zip ]]; then
