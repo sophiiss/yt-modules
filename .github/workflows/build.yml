@@ -51,37 +51,6 @@ jobs:
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
 
-      # ── NEW STEP ──────────────────────────────────────────────────────────────
-      - name: Get YouTube patch version
-        id: yt_version
-        run: |
-          YT_VER=""
-
-          # 1. Try the patched YouTube APK filename (e.g. youtube-revanced-19.16.39.apk)
-          for f in build/youtube*.apk; do
-            [ -f "$f" ] || continue
-            VER=$(basename "$f" | grep -oP '\d+\.\d+\.\d+' | head -1)
-            if [ -n "$VER" ]; then YT_VER="$VER"; break; fi
-          done
-
-          # 2. Fall back to version= in the module zip's module.prop
-          if [ -z "$YT_VER" ]; then
-            for f in build/*module*.zip; do
-              [ -f "$f" ] || continue
-              VER=$(unzip -p "$f" module.prop 2>/dev/null | grep "^version=" | cut -d= -f2 | tr -d '[:space:]')
-              if [ -n "$VER" ]; then YT_VER="$VER"; break; fi
-            done
-          fi
-
-          # 3. Last resort: keep the incrementing integer so nothing breaks
-          if [ -z "$YT_VER" ]; then
-            YT_VER="${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
-          fi
-
-          echo "YT_VERSION=$YT_VER" >> $GITHUB_OUTPUT
-          echo "Resolved release version: $YT_VER"
-      # ─────────────────────────────────────────────────────────────────────────
-
       - name: Get output
         id: get_output
         run: |
@@ -90,19 +59,21 @@ jobs:
           cat build.md >> "$GITHUB_OUTPUT"
           echo "${DELIM}" >> "$GITHUB_OUTPUT"
           cp -f build.md build.tmp
+      
+      - name: Upload release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          BODY: ${{ steps.get_output.outputs.BUILD_LOG }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Release" --notes "$BODY"
+            gh release upload "$TAG" ./build/* --clobber
+          else
+            gh release create "$TAG" ./build/* --title "Release" --notes "$BODY"
+          fi
 
-      - name: Upload modules to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          body: ${{ steps.get_output.outputs.BUILD_LOG }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./build/*
-          release_name: ReVanced ${{ steps.yt_version.outputs.YT_VERSION }}   # ← changed
-          tag: ${{ steps.yt_version.outputs.YT_VERSION }}                      # ← changed
-          file_glob: true
-          overwrite: true
-
-      - name: Update changelog and update json
+      - name: Update modules changelog and update json
         id: update_config
         run: |
           git checkout -f update || git switch --discard-changes --orphan update
@@ -124,19 +95,26 @@ jobs:
             UPDATE_JSON="${UPDATE_JSON##*/}"
             VER=$(echo "$ZIP_S" | grep version=)
             VER="${VER##*=}"
-            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.yt_version.outputs.YT_VERSION }}/${OUTPUT}"   # ← changed
+            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
 
           find . -name "*-update.json" | grep . || : >dummy-update.json
 
-      - uses: stefanzweifel/git-auto-commit-action@v7
-        with:
-          branch: update
-          skip_checkout: true
-          file_pattern: build.md *-update.json
-          commit_message: Bump version ${{ steps.yt_version.outputs.YT_VERSION }}   # ← changed
+      - name: Commit module json changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+          git add build.md *-update.json
+      
+          if ! git diff --cached --quiet; then
+            git commit -m "Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
+            git push origin HEAD:update
+          else
+            echo "no changes!"
+          fi
 
       - name: Report to Telegram
         env:
@@ -150,7 +128,7 @@ jobs:
           APKS=""
           MODULES=""
           for OUTPUT in *; do
-            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.yt_version.outputs.YT_VERSION }}/${OUTPUT}"   # ← changed
+            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
             if [[ $OUTPUT = *.apk ]]; then
               APKS+="${NL}📦[${OUTPUT}](${DL_URL})"
             elif [[ $OUTPUT = *.zip ]]; then
