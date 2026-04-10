@@ -1,6 +1,6 @@
 {
-  "version": "v20.45.36 (patches 1.22.0.mpp)",
-  "versionCode": 3,
-  "zipUrl": "https://github.com/sophiiss/yt-modules/releases/download/v20.45.36(patches1.22.0.mpp)/youtube-morphe-module-v20.45.36-all.zip",
+  "version": "v20.45.36 (patches 1.23.0.mpp)",
+  "versionCode": 1,
+  "zipUrl": "https://github.com/sophiiss/yt-modules/releases/download/1/youtube-morphe-module-v20.45.36-all.zip",
   "changelog": "https://raw.githubusercontent.com/sophiiss/yt-modules/update/build.md"
 }
