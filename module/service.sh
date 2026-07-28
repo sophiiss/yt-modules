@@ -1,5 +1,6 @@
 #!/system/bin/sh
-MODDIR=${0%/*}
+MODDIR="$(dirname "$(readlink -f "$0")")"
+export MODDIR
 . "$MODDIR/utils.sh"
 
 run() {
@@ -13,11 +14,7 @@ run() {
 	do sleep 2; done
 
 	if [ $SVCL != 0 ]; then
-<<<<<<< HEAD
-		desc_err "app not installed"
-=======
-		ch_desc_err "App not installed"
->>>>>>> f1d0c9b (chore(template): merge template changes :up:)
+		ch_desc_err "App not installed: '$BASEPATH'"
 		return
 	fi
 	sleep 4
@@ -25,10 +22,6 @@ run() {
 	mount_rv "$BASEPATH"
 }
 
-<<<<<<< HEAD
-if [ ! -f "$MODDIR/disabled_by_webui" ]; then
-=======
 if [ ! -f "$MODDIR/disabled_by_action" ]; then
->>>>>>> f1d0c9b (chore(template): merge template changes :up:)
 	run
 fi
