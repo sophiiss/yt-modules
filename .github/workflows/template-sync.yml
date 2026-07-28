@@ -18,7 +18,9 @@ jobs:
     steps:
       # To use this repository's private action, you must check out the repository
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.TEMPLATE_SYNC_PAT }}
         # https://github.com/actions/checkout#usage
         # uncomment if you use submodules within the repository
         # with:
@@ -27,7 +29,7 @@ jobs:
       - name: actions-template-sync
         uses: AndreasAugustin/actions-template-sync@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.TEMPLATE_SYNC_PAT }}
           source_repo_path: j-hc/revanced-magisk-module
           upstream_branch: main # defaults to main
           pr_labels: sync
