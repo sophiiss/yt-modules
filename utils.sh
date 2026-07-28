@@ -57,7 +57,13 @@ abort() {
 	kill -9 -- -$$ 2>/dev/null
 	exit 1
 }
-java() { env -i java --enable-native-access=ALL-UNNAMED "$@"; }
+java() {
+	if [ "${JAVA_HOME_21_X64-}" ]; then
+		env -i JAVA_HOME="$JAVA_HOME_21_X64" "$JAVA_HOME_21_X64"/bin/java --enable-native-access=ALL-UNNAMED "$@"
+	else
+		env -i java --enable-native-access=ALL-UNNAMED "$@"
+	fi
+}
 
 get_prebuilts() {
 	local cli_src=$1 cli_ver=$2 patches_src=$3 patches_ver=$4
@@ -66,15 +72,9 @@ get_prebuilts() {
 	cl_dir=${TEMP_DIR}/${cl_dir,,}-rv
 	[ -d "$cl_dir" ] || mkdir "$cl_dir"
 
-	for src_ver in "$cli_src CLI $cli_ver cli" "$patches_src Patches $patches_ver patches"; do
+	for src_ver in "Patches $patches_src $patches_ver" "CLI $cli_src $cli_ver"; do
 		set -- $src_ver
-		local src=$1 tag=$2 ver=${3-} fprefix=$4
-
-		if [ "$tag" = "CLI" ]; then
-			local grab_cl=false
-		elif [ "$tag" = "Patches" ]; then
-			local grab_cl=true
-		else abort unreachable; fi
+		local tag=$1 src=$2 ver=${3-}
 
 		local dir=${src%/*}
 		dir=${TEMP_DIR}/${dir,,}-rv
@@ -94,8 +94,16 @@ get_prebuilts() {
 			name_ver="$ver"
 		fi
 
-		local url file tag_name matches
-		file=$(find "$dir" -name "*${fprefix}-${name_ver#v}.*" -type f 2>/dev/null)
+		local file
+		if [ "$tag" = "CLI" ]; then
+			file=$(find "$dir" -maxdepth 1 -name "*cli-${name_ver#v}*.jar" -o -name "*desktop-${name_ver#v}*.jar" -type f 2>/dev/null)
+			local grab_cl=false
+		elif [ "$tag" = "Patches" ]; then
+			file=$(find "$dir" -maxdepth 1 -name "*patches-${name_ver#v}.*" -type f 2>/dev/null)
+			local grab_cl=true
+		else abort unreachable; fi
+
+		local url tag_name matches
 		if [ "$ver" = "latest" ]; then
 			file=$(grep -v '/[^/]*dev[^/]*$' <<<"$file" | head -1)
 		else
@@ -189,7 +197,7 @@ config_update() {
 			elif [ "$PATCHES_VER" = "latest" ]; then
 				last_patches=$(gh_req "$rv_rel/latest" -) || continue
 			else
-				last_patches=$(gh_req "$rv_rel/tags/${ver}" -) || continue
+				last_patches=$(gh_req "$rv_rel/tags/${PATCHES_VER}" -) || continue
 			fi
 			if ! last_patches=$(jq -e -r '.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name' <<<"$last_patches"); then
 				abort "config_update error: '$last_patches'"
@@ -229,6 +237,7 @@ _req() {
 	fi
 	if ! curl -L -c "$TEMP_DIR/cookie.txt" -b "$TEMP_DIR/cookie.txt" --connect-timeout 10 --retry 1 --fail -s -S "$@" "$ip" -o "$dlp"; then
 		epr "Request failed: $ip"
+		if [ "$dlp" != - ]; then rm -f "$dlp"; fi
 		return 1
 	fi
 	if [ "$dlp" != - ]; then
@@ -282,7 +291,11 @@ get_patch_last_supported_ver() {
 	if [ "$op" = "Any" ]; then return; fi
 	pcount=$(head -1 <<<"$op") pcount=${pcount#*(} pcount=${pcount% *}
 	if [ -z "$pcount" ]; then
-		abort "No patches found for '$pkg_name' in patches '$patches_jar'"
+		if grep -Fq "$pkg_name" <<<"$list_patches"; then
+			return
+		else
+			abort "No patches found for '$pkg_name' in patches '$patches_jar'"
+		fi
 	fi
 	grep -F "($pcount patch" <<<"$op" | sed 's/ (.* patch.*//' | get_highest_ver || return 1
 }
@@ -308,14 +321,14 @@ patches_list_versions() {
 		return
 	fi
 
-	epr "Could not list versions $cli_jar: '$op'"
+	epr "Could not list versions ($pkg_name) $cli_jar: '$op'"
 	return 1
 }
 patches_list() {
 	local cli_jar=$1 patches_jar=$2 pkg_name=$3 op
 	if ! op=$(java -jar "$cli_jar" list-patches -p "$patches_jar" --filter-package-name "$pkg_name" --versions --packages -b 2>&1); then
 		if ! op=$(java -jar "$cli_jar" list-patches --patches "$patches_jar" -f "$pkg_name" --with-versions --with-packages 2>&1); then
-			epr "Could not get patches list $cli_jar: '$op'"
+			epr "Could not get patches list ($pkg_name) $cli_jar: '$op'"
 			return 1
 		fi
 
