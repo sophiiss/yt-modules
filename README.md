@@ -1,12 +1,8 @@
-# ReVanced Magisk Module
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/rvc_magisk)
-[![CI](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml)
+## YouTube Morphe KSU/Magisk Module Generator
 
-Extensive ReVanced builder  
+Template from [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module/)
 
-Get the [latest CI release](https://github.com/j-hc/revanced-magisk-module/releases).
-
-Use [**zygisk-detach**](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music from Play Store if you are using magisk modules. 
+Use [**zygisk-detach**](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music from Play Store if you are using magisk modules
 
 <details><summary><big>Features</big></summary>
 <ul>
@@ -45,12 +41,12 @@ You can consider using [rvmm-zygisk-mount](https://github.com/j-hc/rvmm-zygisk-m
 ## Building Locally
 ### On Termux
 ```console
-bash <(curl -sSf https://raw.githubusercontent.com/j-hc/revanced-magisk-module/main/build-termux.sh)
+bash <(curl -sSf https://raw.githubusercontent.com/sophiiss/yt-modules/main/build-termux.sh)
 ```
 
 ### On Linux
 ```console
-$ git clone https://github.com/j-hc/revanced-magisk-module --depth 1
-$ cd revanced-magisk-module
+$ git clone https://github.com/sophiiss/yt-modules --depth 1
+$ cd yt-modules
 $ ./build.sh
 ```
